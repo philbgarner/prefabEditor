@@ -1,0 +1,7 @@
+assetlist = {
+  {
+    name = "demo1"
+    ,image = "demo1.png"
+    ,hitbox = {0.0, 0.0, 1.0, 1.0}
+  }
+}

@@ -1,7 +1,60 @@
-assetlist = {
-  {
-    name = "demo1"
-    ,image = "demo1.png"
-    ,hitbox = {0.0, 0.0, 1.0, 1.0}
-  }
+return {
+-- Table: {1}
+{
+   ["sunrise_rock2.png"]={2},
+   ["sunrise_rock1.png"]={3},
+},
+-- Table: {2}
+{
+   ["physical_properties"]={4},
+   ["collision_settings"]={5},
+   ["bound_poly"]={6},
+   ["asset_properties"]={7},
+},
+-- Table: {3}
+{
+   ["physical_properties"]={8},
+   ["collision_settings"]={9},
+   ["bound_poly"]={10},
+   ["asset_properties"]={11},
+},
+-- Table: {4}
+{
+   ["mass"]=0,
+   ["angular_d"]=0,
+   ["linear_d"]=0,
+   ["bodytype"]=1,
+},
+-- Table: {5}
+{
+   ["cCat"]=0,
+   ["cMask"]=0,
+   ["cGroup"]=0,
+},
+-- Table: {6}
+{
+},
+-- Table: {7}
+{
+},
+-- Table: {8}
+{
+   ["mass"]=0,
+   ["angular_d"]=0,
+   ["linear_d"]=0,
+   ["bodytype"]=1,
+},
+-- Table: {9}
+{
+   ["cCat"]=0,
+   ["cMask"]=0,
+   ["cGroup"]=0,
+},
+-- Table: {10}
+{
+},
+-- Table: {11}
+{
+   ["name"]="Boulder 1",
+},
 }

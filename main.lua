@@ -1,4 +1,6 @@
 require "imgui"
+require "table_io"
+--require os
 
 assetlist = {}
 
@@ -11,6 +13,9 @@ prop_val = nil
 prop_key = nil
 newprop = ""
 newPropWindow = false
+
+savePackWindow = false
+savePackFilename = "assetpack"
 
 sel_poly = 0
 bound_poly = {}
@@ -28,7 +33,25 @@ physical_properties = {
     ,bodytype = 1
   }
 asset_properties = {
-  }
+}
+
+-- Save assets.list
+function saveAssets()
+  table.save(assetlist , "assets/assets.list")
+end
+
+-- Load assets.list
+function loadAssets()
+  assetlist = table.load("assets/assets.list")
+end
+
+-- Export Pack by bunding images and assets.list from the assets subfolder into
+-- a zip file.
+
+function exportAssets(file)
+  love.filesystem.remove(file)
+  os.execute("7z a " .. file .. ".zip ./assets/*")
+end
 
 function addAsset(filename)
   if assetlist[filename] ~= nil then return end
@@ -97,7 +120,7 @@ image_file = ""
 img = nil
 
 function love.load()
-
+  loadAssets()
 end
 
 function love.update(dt)
@@ -106,10 +129,27 @@ end
 function love.draw()
   imgui.NewFrame()
 
-  wndAssets(5, 5)
-  wndImage(261, 5)  
-  
-
+    -- Menu
+    if imgui.BeginMainMenuBar() then
+        if imgui.BeginMenu("File") then
+            if imgui.MenuItem("Save assets.list") then
+              saveAssets()
+            end
+            if imgui.MenuItem("Load assets.list") then 
+              loadAssets()
+            end
+            if imgui.MenuItem("Export") then
+              saveAssets()
+              savePackWindow = true
+            end
+            if imgui.MenuItem("Exit") then love.quit() end
+            imgui.EndMenu()
+        end
+        imgui.EndMainMenuBar()
+    end
+    
+  wndAssets(5, 25)
+  wndImage(261, 25)  
   
   if #bound_poly > 2 then
     love.graphics.setLineWidth(2)
@@ -131,7 +171,7 @@ function love.draw()
   end
   
   wndCollisions(5, 530)
-  wndPhysics(1330, 5)
+  wndPhysics(1330, 25)
   wndProperties(1330, 275)
   
   if newPropWindow then
@@ -149,6 +189,20 @@ function love.draw()
     imgui.End()
   end 
   
+  if savePackWindow then
+    imgui.SetNextWindowPos(love.graphics.getWidth() / 2 - 128, love.graphics.getHeight() / 2 - 64, "New Property")
+    imgui.SetNextWindowSize(256, 128, "Export Pack")
+    status, exportWindow = imgui.Begin("Export Pack", true, {"NoCollapse", "TitleBar", "ShowBorders", "NoResize", "NoMove"})
+    imgui.PushItemWidth(80)
+    status, savePackFilename = imgui.InputText("Filename", savePackFilename, 255)
+    if imgui.Button("Ok") then
+      exportAssets(savePackFilename)
+      
+      savePackWindow = false
+    end
+    imgui.End()
+  end 
+  
   imgui.Render();
 
 end
@@ -156,14 +210,6 @@ end
 
 function love.quit()
   imgui.ShutDown();
-end
-
--- Save Function
--- Builds a .lua file from the points stored in the
--- bound_poly, physics_settings and asset_properties arrays.
-
-function buildAssetsCatalog()
-
 end
 
 -- Editor Window Definitions

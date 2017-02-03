@@ -30,4 +30,4 @@ script that has all of the corresponding physical properties in a separate file.
 
 The game engine will unpack the prefab pack to a special folder during execution.
 
-(Implementation is not complete yet in this commit).
+If the 'Export' menu feature is not working (no 7z CLI available, perhaps?), simply add the files inside the assets folder to a new zip manually (do not include the folder, just the files).

@@ -1,4 +1,5 @@
 require "imgui"
+require "imgui"
 require "table_io"
 --require os
 
@@ -7,6 +8,7 @@ assetlist = {}
  
 box_x = 0
 box_y = 0
+box_r = 10
 
 sel_prop = 0
 prop_val = nil
@@ -23,6 +25,7 @@ collision_settings = {
     cCat = 0
     ,cMask = 0
     ,cGroup = 0
+    ,radius = box_r
   }
 physical_properties = {
     mass = 0
@@ -111,9 +114,6 @@ end
 
 function removePoint(id)
   table.remove(bound_poly, id)
-  if sel_poly > #bound_poly then
-    sel_poly = #bound_poly
-  end
 end
 
 image_file = ""
@@ -151,25 +151,6 @@ function love.draw()
   wndAssets(5, 25)
   wndImage(261, 25)  
   
-  if #bound_poly > 2 then
-    love.graphics.setLineWidth(2)
-    love.graphics.setColor(0, 0, 0)
-    --love.graphics.rectangle("line", 262 + 8 + dx, 33 + dy, dw, dh)
-    local pol = {}
-    for i=1, #bound_poly do
-      table.insert(pol, (bound_poly[i].x * img:getWidth()) + 262 + 8 )
-      table.insert(pol, (bound_poly[i].y * img:getHeight()) + 33 )
-    end
-    love.graphics.polygon("line", pol)
-    love.graphics.setColor(255, 255, 255)
-    love.graphics.push()
-      love.graphics.translate(1, 1)
-      love.graphics.polygon("line", pol)
-    --love.graphics.rectangle("line", 261 + 8 + dx, 32 + dy, dw, dh)
-    love.graphics.pop()
-    love.graphics.setLineWidth(1)
-  end
-  
   wndCollisions(5, 530)
   wndPhysics(1330, 25)
   wndProperties(1330, 275)
@@ -205,6 +186,46 @@ function love.draw()
   
   imgui.Render();
 
+  if #bound_poly > 2 or (physical_properties.bodytype == 2 and #bound_poly == 1) then
+    love.graphics.setLineWidth(2)
+    love.graphics.setColor(0, 0, 0)
+    --love.graphics.rectangle("line", 262 + 8 + dx, 33 + dy, dw, dh)
+    if physical_properties.bodytype == 1 then -- Static body.
+      local pol = {}
+      for i=1, #bound_poly do
+        table.insert(pol, (bound_poly[i].x * img:getWidth()) + 270 )
+        table.insert(pol, (bound_poly[i].y * img:getHeight()) + 50)
+      end
+      love.graphics.line(pol)
+      love.graphics.setColor(255, 255, 255)
+      love.graphics.push()
+        love.graphics.translate(1, 1)
+        love.graphics.line(pol)
+      --love.graphics.rectangle("line", 261 + 8 + dx, 32 + dy, dw, dh)
+      love.graphics.pop()
+      if sel_poly ~= nil and bound_poly[sel_poly] ~= nil then 
+        love.graphics.setColor(0, 0, 0)
+        love.graphics.circle("line", (bound_poly[sel_poly].x * img:getWidth()) + 270 , (bound_poly[sel_poly].y * img:getHeight()) + 50, 4)
+        love.graphics.setColor(255, 255, 255)
+        love.graphics.push()
+          love.graphics.translate(1, 1)
+          love.graphics.line(pol)
+          love.graphics.setColor(255, 255, 0)
+          love.graphics.circle("line", (bound_poly[sel_poly].x * img:getWidth()) + 270 , (bound_poly[sel_poly].y * img:getHeight()) + 50, 4)
+        love.graphics.pop()
+      end
+      love.graphics.setColor(255, 255, 255)
+    elseif physical_properties.bodytype == 2 then  -- Dynamic Body
+      love.graphics.setColor(255, 255, 255)
+      love.graphics.circle("line", (bound_poly[1].x * img:getWidth()) + 270, (bound_poly[1].y * img:getHeight()) + 50, box_r)
+      love.graphics.push()
+        love.graphics.translate(1, 1)
+        love.graphics.circle("line", (bound_poly[1].x * img:getWidth()) + 270, (bound_poly[1].y * img:getHeight()) + 50, box_r)
+      love.graphics.pop()
+    end
+    love.graphics.setLineWidth(1)
+  end
+  
 end
 
 
@@ -212,7 +233,7 @@ function love.quit()
   imgui.ShutDown();
 end
 
--- Editor Window Definitions
+-- Editor Window)initions
 
 function wndAssets(x, y)
   imgui.SetNextWindowPos(x, y, "Images")
@@ -258,7 +279,7 @@ function wndCollisions(x, y)
     end
     if imgui.Selectable("#" .. i .. " (" .. string.format("%.3f", bound_poly[i].x) .. ", " .. string.format("%.3f", bound_poly[i].y) .. ")", s) then
       box_x = bound_poly[i].x
-    box_y = bound_poly[i].y
+      box_y = bound_poly[i].y
       sel_poly = i
     end
   end
@@ -267,11 +288,16 @@ function wndCollisions(x, y)
 
   status, box_x = imgui.SliderFloat("x", box_x, 0, 1, "%.3f", 1) 
   status, box_y = imgui.SliderFloat("y", box_y, 0, 1, "%.3f", 1)
+  if physical_properties.bodytype == 2 then
+    status, box_r = imgui.SliderFloat("radius", box_r, 0, img:getWidth(), "%.3f", 1)
+  end
 
-  if sel_poly > 0 then
+  if sel_poly > 0 and sel_poly <= #bound_poly then
     bound_poly[sel_poly].x = box_x
     bound_poly[sel_poly].y = box_y
   end
+  
+  collision_settings.radius = box_r
   
   imgui.Separator()
 

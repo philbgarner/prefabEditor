@@ -1,6 +1,9 @@
 require "imgui"
 require "imgui"
 require "table_io"
+require "prefabs_io"
+anim8 = require "anim8"
+
 --require os
 
 assetlist = {}
@@ -8,7 +11,6 @@ assetlist = {}
  
 box_x = 0
 box_y = 0
-box_r = 10
 
 sel_prop = 0
 prop_val = nil
@@ -16,36 +18,30 @@ prop_key = nil
 newprop = ""
 newPropWindow = false
 
+image_file = ""
+img = nil
+anim = nil
+
 savePackWindow = false
 savePackFilename = "assetpack"
 
 sel_poly = 0
-bound_poly = {}
-collision_settings = {  
-    cCat = 0
-    ,cMask = 0
-    ,cGroup = 0
-    ,radius = box_r
-  }
-physical_properties = {
-    mass = 0
-    ,linear_d = 0
-    ,angular_d = 0
-    ,bodytype = 0
-    ,bullet = false
-    ,bodytype = 1
-  }
-asset_properties = {
-}
 
 -- Save assets.list
 function saveAssets()
-  table.save(assetlist , "assets/assets.list")
+  --table.save(assetlist , "assets/assets.list")
+  writeAssetList()
 end
 
 -- Load assets.list
 function loadAssets()
-  assetlist = table.load("assets/assets.list")
+  --assetlist = table.load("assets/assets.list")  
+  loadAssetList()
+  image_file = ""
+  sel_poly = 0
+  sel_prop = 0
+  prop_val = nil
+  prop_key = nil
 end
 
 -- Export Pack by bunding images and assets.list from the assets subfolder into
@@ -58,12 +54,17 @@ end
 
 function addAsset(filename)
   if assetlist[filename] ~= nil then return end
+  local im = love.graphics.newImage("assets/" .. filename)
+  local w = im:getWidth()
+  local h = im:getHeight()
   assetlist[filename] = {
       bound_poly = {}
       ,collision_settings = {
             cCat = 0
           ,cMask = 0
-          ,cGroup = 0}
+          ,cGroup = 0
+          ,radius = 10
+        }
       ,physical_properties = {
           mass = 0
           ,linear_d = 0
@@ -73,33 +74,31 @@ function addAsset(filename)
           ,bodytype = 1
         }
       ,asset_properties = {
-      }
+          animated = false
+          ,animation_gridx = "1-1"
+          ,animation_gridy = "1-1"
+          ,animation_delay = 0.1
+          ,animation_w = w
+          ,animation_h = h
+        }
     }
 end
 function removeAsset(filename)
   local al = {}
-  for key, value in #assetlist do
+  for key, value in pairs(assetlist) do
     if key ~= filename then
       al[key] = value
     end
   end
   assetlist = al
 end
-function switchAsset(old_filename, new_filename)
-  if old_filename ~= nil and old_filename ~= "" and assetlist[old_filename] ~= nil then    
-    assetlist[old_filename].bound_poly = bound_poly
-    assetlist[old_filename].collision_settings = collision_settings
-    assetlist[old_filename].physical_properties = physical_properties
-    assetlist[old_filename].asset_properties = asset_properties
-  end
+function switchAsset(new_filename)
   
   if assetlist[new_filename] == nil then
     addAsset(new_filename)
   end
-  bound_poly = assetlist[new_filename].bound_poly
-  collision_settings = assetlist[new_filename].collision_settings
-  physical_properties = assetlist[new_filename].physical_properties
-  asset_properties = assetlist[new_filename].asset_properties
+  
+  local im = love.graphics.newImage("assets/" .. new_filename)
   
   -- Update globals that might need it
   sel_poly = 0
@@ -109,21 +108,24 @@ function switchAsset(old_filename, new_filename)
 end
 
 function newPoint(x, y)
-  table.insert(bound_poly, {x = x, y = y})
+  table.insert(assetlist[image_file].bound_poly, {x = x, y = y})
 end
 
 function removePoint(id)
-  table.remove(bound_poly, id)
+  table.remove(assetlist[image_file].bound_poly, id)
 end
 
-image_file = ""
-img = nil
-
 function love.load()
-  loadAssets()
+  
+  
 end
 
 function love.update(dt)
+  
+  if anim ~= nil then
+    anim:update(dt)
+  end
+  
 end
 
 function love.draw()
@@ -185,16 +187,24 @@ function love.draw()
   end 
   
   imgui.Render();
+  if assetlist[image_file] == nil then return end
+  if anim ~= nil then anim:draw(img, 270, 50) end
 
-  if #bound_poly > 2 or (physical_properties.bodytype == 2 and #bound_poly == 1) then
+  if #assetlist[image_file].bound_poly > 2 or (assetlist[image_file].physical_properties.bodytype == 2 and #assetlist[image_file].bound_poly == 1) then
     love.graphics.setLineWidth(2)
     love.graphics.setColor(0, 0, 0)
-    --love.graphics.rectangle("line", 262 + 8 + dx, 33 + dy, dw, dh)
-    if physical_properties.bodytype == 1 then -- Static body.
+    
+    anim_w = tonumber(assetlist[image_file].asset_properties.animation_w)
+    anim_h = tonumber(assetlist[image_file].asset_properties.animation_h)
+    
+    if anim_w == nil then anim_w = 0 end
+    if anim_h == nil then anim_h = 0 end
+    
+    if assetlist[image_file].physical_properties.bodytype == 1 then -- Static body.
       local pol = {}
-      for i=1, #bound_poly do
-        table.insert(pol, (bound_poly[i].x * img:getWidth()) + 270 )
-        table.insert(pol, (bound_poly[i].y * img:getHeight()) + 50)
+      for i=1, #assetlist[image_file].bound_poly do
+        table.insert(pol, (assetlist[image_file].bound_poly[i].x * img:getWidth()) + 270 )
+        table.insert(pol, (assetlist[image_file].bound_poly[i].y * img:getHeight()) + 50)
       end
       love.graphics.line(pol)
       love.graphics.setColor(255, 255, 255)
@@ -203,24 +213,24 @@ function love.draw()
         love.graphics.line(pol)
       --love.graphics.rectangle("line", 261 + 8 + dx, 32 + dy, dw, dh)
       love.graphics.pop()
-      if sel_poly ~= nil and bound_poly[sel_poly] ~= nil then 
+      if sel_poly ~= nil and assetlist[image_file].bound_poly[sel_poly] ~= nil then 
         love.graphics.setColor(0, 0, 0)
-        love.graphics.circle("line", (bound_poly[sel_poly].x * img:getWidth()) + 270 , (bound_poly[sel_poly].y * img:getHeight()) + 50, 4)
+        love.graphics.circle("line", (assetlist[image_file].bound_poly[sel_poly].x * anim_w) + 270 , (assetlist[image_file].bound_poly[sel_poly].y * anim_h) + 50, 4)
         love.graphics.setColor(255, 255, 255)
         love.graphics.push()
           love.graphics.translate(1, 1)
           love.graphics.line(pol)
           love.graphics.setColor(255, 255, 0)
-          love.graphics.circle("line", (bound_poly[sel_poly].x * img:getWidth()) + 270 , (bound_poly[sel_poly].y * img:getHeight()) + 50, 4)
+          love.graphics.circle("line", (assetlist[image_file].bound_poly[sel_poly].x * anim_w) + 270 , (assetlist[image_file].bound_poly[sel_poly].y * anim_h) + 50, 4)
         love.graphics.pop()
       end
       love.graphics.setColor(255, 255, 255)
-    elseif physical_properties.bodytype == 2 then  -- Dynamic Body
+    elseif assetlist[image_file].physical_properties.bodytype == 2 then  -- Dynamic Body
       love.graphics.setColor(255, 255, 255)
-      love.graphics.circle("line", (bound_poly[1].x * img:getWidth()) + 270, (bound_poly[1].y * img:getHeight()) + 50, box_r)
+      love.graphics.circle("line", (assetlist[image_file].bound_poly[1].x * anim_w) + 270, (assetlist[image_file].bound_poly[1].y * anim_h) + 50, assetlist[image_file].collision_settings.radius)
       love.graphics.push()
         love.graphics.translate(1, 1)
-        love.graphics.circle("line", (bound_poly[1].x * img:getWidth()) + 270, (bound_poly[1].y * img:getHeight()) + 50, box_r)
+        love.graphics.circle("line", (assetlist[image_file].bound_poly[1].x * anim_w) + 270, (assetlist[image_file].bound_poly[1].y * anim_h) + 50, assetlist[image_file].collision_settings.radius)
       love.graphics.pop()
     end
     love.graphics.setLineWidth(1)
@@ -232,8 +242,6 @@ end
 function love.quit()
   imgui.ShutDown();
 end
-
--- Editor Window)initions
 
 function wndAssets(x, y)
   imgui.SetNextWindowPos(x, y, "Images")
@@ -248,9 +256,12 @@ function wndAssets(x, y)
       local s = false
       if file == image_file then s = true end
       if imgui.Selectable(file, s) then
-        switchAsset(image_file, file)
         image_file = file
+        switchAsset(file)
         img = love.graphics.newImage("assets/" .. image_file)
+        --print(assetlist, image_file, assetlist[image_file])
+        local g = anim8.newGrid(tonumber(assetlist[image_file].asset_properties.animation_w), tonumber(assetlist[image_file].asset_properties.animation_h), img:getWidth(), img:getHeight())
+        anim = anim8.newAnimation(g(assetlist[image_file].asset_properties.animation_gridx, assetlist[image_file].asset_properties.animation_gridy), tonumber(assetlist[image_file].asset_properties.animation_delay))
       end
     end
   end
@@ -259,6 +270,14 @@ function wndAssets(x, y)
 end
 
 function wndCollisions(x, y)
+  if assetlist[image_file] == nil then return end
+  
+  anim_w = tonumber(assetlist[image_file].asset_properties.animation_w)
+  anim_h = tonumber(assetlist[image_file].asset_properties.animation_h)
+  
+  if anim_w == nil then anim_w = 0 end
+  if anim_h == nil then anim_h = 0 end
+  
   imgui.SetNextWindowPos(x, y, "Images")
   imgui.SetNextWindowSize(256, 400, "Images")
   status, showAnotherWindow = imgui.Begin("Collision Settings", true, { "NoCollapse", "TitleBar", "ShowBorders", "NoResize", "AlwaysVerticalScrollbar" })
@@ -271,15 +290,14 @@ function wndCollisions(x, y)
   if imgui.Button("Remove Point") then
     removePoint(sel_poly)
   end
-    
-  for i=1, #bound_poly do
+  for i=1, #assetlist[image_file].bound_poly do
     local s = false
     if i == sel_poly then
       s = true
     end
-    if imgui.Selectable("#" .. i .. " (" .. string.format("%.3f", bound_poly[i].x) .. ", " .. string.format("%.3f", bound_poly[i].y) .. ")", s) then
-      box_x = bound_poly[i].x
-      box_y = bound_poly[i].y
+    if imgui.Selectable("#" .. i .. " (" .. string.format("%.3f", assetlist[image_file].bound_poly[i].x) .. ", " .. string.format("%.3f", assetlist[image_file].bound_poly[i].y) .. ")", s) then
+      box_x = assetlist[image_file].bound_poly[i].x
+      box_y = assetlist[image_file].bound_poly[i].y
       sel_poly = i
     end
   end
@@ -288,48 +306,48 @@ function wndCollisions(x, y)
 
   status, box_x = imgui.SliderFloat("x", box_x, 0, 1, "%.3f", 1) 
   status, box_y = imgui.SliderFloat("y", box_y, 0, 1, "%.3f", 1)
-  if physical_properties.bodytype == 2 then
-    status, box_r = imgui.SliderFloat("radius", box_r, 0, img:getWidth(), "%.3f", 1)
+  if assetlist[image_file].physical_properties.bodytype == 2 then
+    status, assetlist[image_file].collision_settings.radius = imgui.SliderFloat("radius", tonumber(assetlist[image_file].collision_settings.radius), 0, anim_w, "%.3f", 1)
   end
 
-  if sel_poly > 0 and sel_poly <= #bound_poly then
-    bound_poly[sel_poly].x = box_x
-    bound_poly[sel_poly].y = box_y
+  if sel_poly > 0 and sel_poly <= #assetlist[image_file].bound_poly then
+    assetlist[image_file].bound_poly[sel_poly].x = box_x
+    assetlist[image_file].bound_poly[sel_poly].y = box_y
   end
-  
-  collision_settings.radius = box_r
   
   imgui.Separator()
 
   imgui.Text("Collision Groups")
 
-  status, collision_settings.cCat = imgui.InputInt("Category", collision_settings.cCat, 0, 16)
-  status, collision_settings.cMask = imgui.InputInt("Mask", collision_settings.cMask, 0, 16)
-  status, collision_settings.cGroup = imgui.InputInt("Group", collision_settings.cGroup, 0, 16)
+  status, assetlist[image_file].collision_settings.cCat = imgui.InputInt("Category", assetlist[image_file].collision_settings.cCat, 0, 16)
+  status, assetlist[image_file].collision_settings.cMask = imgui.InputInt("Mask", assetlist[image_file].collision_settings.cMask, 0, 16)
+  status, assetlist[image_file].collision_settings.cGroup = imgui.InputInt("Group", assetlist[image_file].collision_settings.cGroup, 0, 16)
 
   imgui.End()
 
 end
 
 function wndPhysics(x, y)
+  if assetlist[image_file] == nil then return end
   
   imgui.SetNextWindowPos(x, y, "Physical Properties")
   imgui.SetNextWindowSize(512, 256, "Physical Properties")
   status, physicsWindow = imgui.Begin("Physical Properties", true, {"NoCollapse", "TitleBar", "ShowBorders", "NoResize", "AlwaysVerticalScrollbar"})
-  status, physical_properties.bullet = imgui.Checkbox("'Bullet' Physics", physical_properties.bullet)
-  status, physical_properties.mass = imgui.SliderFloat("Mass", physical_properties.mass, 0, 1000, "%.3f") 
-  status, physical_properties.angular_d = imgui.SliderFloat("Angular Damping", physical_properties.angular_d, 0, 0.1, "%.3f") 
-  status, physical_properties.linear_d = imgui.SliderFloat("Linear Damping", physical_properties.linear_d, 0, 0.1, "%.3f") 
-  status, physical_properties.bodytype = imgui.Combo("Body Type", physical_properties.bodytype, {"Static", "Dynamic"}, 2)
+  status, assetlist[image_file].physical_properties.bullet = imgui.Checkbox("'Bullet' Physics", assetlist[image_file].physical_properties.bullet)
+  status, assetlist[image_file].physical_properties.mass = imgui.SliderFloat("Mass", assetlist[image_file].physical_properties.mass, 0, 1000, "%.3f") 
+  status, assetlist[image_file].physical_properties.angular_d = imgui.SliderFloat("Angular Damping", assetlist[image_file].physical_properties.angular_d, 0, 0.1, "%.3f") 
+  status, assetlist[image_file].physical_properties.linear_d = imgui.SliderFloat("Linear Damping", assetlist[image_file].physical_properties.linear_d, 0, 0.1, "%.3f") 
+  status, assetlist[image_file].physical_properties.bodytype = imgui.Combo("Body Type", assetlist[image_file].physical_properties.bodytype, {"Static", "Dynamic"}, 2)
   imgui.End()
   
 end
 
 function wndProperties(x, y)
+  if assetlist[image_file] == nil then return end
   
   imgui.SetNextWindowPos(x, y, "Asset Properties")
   imgui.SetNextWindowSize(512, 256, "Asset Properties")
-  status, physicsWindow = imgui.Begin("Asset Properties", true, {"NoCollapse", "TitleBar", "ShowBorders", "NoResize", "AlwaysVerticalScrollbar"})
+  status, physicsWindow = imgui.Begin("Asset Properties", true, {"NoCollapse", "TitleBar", "ShowBorders", "NoResize", "AlwaysVerticalScrollbar", "AlwaysHorizontalScrollbar"})
   imgui.Text("Key / Value") imgui.SameLine()
   
   if imgui.Button("New Property") then
@@ -338,28 +356,29 @@ function wndProperties(x, y)
   end
   
   local i = 1
-  for key, value in pairs(asset_properties) do
+  for key, value in pairs(assetlist[image_file].asset_properties) do
     imgui.Text(key .. " = ") imgui.SameLine()
     if sel_prop == i then
       prop_val = value
       prop_key = key
-      status, prop_val = imgui.InputText("", prop_val, 255)
+      status, prop_val = imgui.InputText("", tostring(prop_val), 255)
       imgui.SameLine()
       if status then
-        asset_properties[prop_key] = prop_val
+        assetlist[image_file].asset_properties[prop_key] = tostring(prop_val)
       end
       if imgui.Button("Remove") then
-        asset_properties[prop_key] = nil
+        assetlist[image_file].asset_properties[prop_key] = nil
         prop_val = nil
         sel_prop = 0
       end
     else
-      if imgui.Selectable(value)then
+      if imgui.Selectable(tostring(value)) then
         sel_prop = i
       end
     end
     i = i + 1
   end
+  imgui.Separator()
   imgui.End()
   
 end
@@ -370,7 +389,7 @@ function wndImage(x, y)
   imgui.SetNextWindowSize(img:getWidth() + 15, img:getHeight() + 40, "Images")
   status, showAnotherWindow = imgui.Begin("Image: sunrise_rock1.png", false, { "NoCollapse", "TitleBar", "ShowBorders", "NoResize", "AlwaysVerticalScrollbar" })
 
-  imgui.Image(img, img:getWidth(), img:getHeight())
+--  imgui.Image(img, img:getWidth(), img:getHeight())
 
   imgui.End()
 end
